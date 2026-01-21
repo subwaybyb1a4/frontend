@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router"; // 💡 useFocusEffect 추가
 import {
   Bell,
   ChevronRight,
@@ -7,7 +7,7 @@ import {
   Search,
   Star,
 } from "lucide-react-native";
-import React from "react";
+import { useCallback, useState } from "react"; // 💡 useState, useCallback 추가
 import {
   ScrollView,
   StatusBar,
@@ -18,27 +18,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// 1. 데이터 (에러 방지용 내장 데이터)
-const mockRoutes = [
-  {
-    id: "1",
-    name: "출근길 (최적)",
-    from: "건대입구",
-    to: "강남",
-    time: 25,
-    congestion: "low",
-  },
-  {
-    id: "2",
-    name: "학교 가는 길",
-    from: "잠실",
-    to: "건대입구",
-    time: 12,
-    congestion: "medium",
-  },
-];
+// 💡 저장소 함수 가져오기 (경로가 다르다면 수정 필요)
+import { getFavorites } from "../../utils/storage";
 
-// 혼잡도 뱃지
+// 혼잡도 뱃지 컴포넌트 (그대로 유지)
 const CongestionBadge = ({ level }: { level: string }) => {
   let bg = "#F3F4F6";
   let text = "#4B5563";
@@ -68,14 +51,31 @@ const CongestionBadge = ({ level }: { level: string }) => {
 export default function Home() {
   const router = useRouter();
 
+  // 💡 [변경] 가짜 데이터 대신 실제 데이터를 담을 상태(State) 생성
+  const [favorites, setFavorites] = useState<any[]>([]);
+
+  // 💡 [핵심] 화면이 포커스될 때마다(다른 탭 갔다 왔을 때) 실행됨
+  useFocusEffect(
+    useCallback(() => {
+      const loadData = async () => {
+        try {
+          const data = await getFavorites();
+          setFavorites(data || []); // 데이터가 없으면 빈 배열
+        } catch (e) {
+          console.error("즐겨찾기 로드 실패:", e);
+        }
+      };
+      loadData();
+    }, []),
+  );
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
-      {/* 1. 히어로 섹션 (검색창 강조 영역) */}
+      {/* 1. 히어로 섹션 (검색창 등 - 그대로 유지) */}
       <View style={styles.heroSection}>
         <SafeAreaView edges={["top"]}>
-          {/* 상단 로고 & 알림 */}
           <View style={styles.topBar}>
             <View style={styles.logoContainer}>
               <View style={styles.logoIcon}>
@@ -89,13 +89,11 @@ export default function Home() {
             </TouchableOpacity>
           </View>
 
-          {/* 메인 문구 */}
           <View style={styles.greetingContainer}>
             <Text style={styles.greetingSub}>오늘도 쾌적한 이동!</Text>
             <Text style={styles.greetingMain}>어디로 떠나시나요?</Text>
           </View>
 
-          {/* 🔥 주인공: 대형 검색창 */}
           <TouchableOpacity
             activeOpacity={0.9}
             onPress={() => router.push("/search")}
@@ -122,52 +120,77 @@ export default function Home() {
             <Star size={20} color="#F59E0B" fill="#F59E0B" />
             <Text style={styles.sectionTitle}>즐겨찾는 경로</Text>
           </View>
-          <TouchableOpacity onPress={() => router.push("/favorites")}>
+          {/* 전체보기 버튼은 나중에 기능 구현 필요 */}
+          <TouchableOpacity onPress={() => router.push("/favorites" as any)}>
             <Text style={styles.viewAll}>전체보기</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.cardList}>
-          {mockRoutes.map((route) => (
-            <TouchableOpacity
-              key={route.id}
-              activeOpacity={0.8}
-              onPress={() =>
-                router.push({
-                  pathname: "/results",
-                  params: { from: route.from, to: route.to },
-                })
-              }
-              style={styles.card}
-            >
-              {/* 카드 상단 */}
-              <View style={styles.cardHeader}>
-                <View>
-                  <Text style={styles.routeName}>{route.name}</Text>
-                  <View style={styles.routeRow}>
-                    <Text style={styles.routeStation}>{route.from}</Text>
-                    <ChevronRight size={14} color="#9CA3AF" />
-                    <Text style={styles.routeStation}>{route.to}</Text>
+          {/* 💡 [변경] 즐겨찾기 데이터 유무에 따라 화면 다르게 표시 */}
+          {favorites.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                즐겨찾는 경로가 없습니다 텅..
+              </Text>
+            </View>
+          ) : (
+            favorites.map((route, index) => (
+              <TouchableOpacity
+                key={route.id || index}
+                activeOpacity={0.8}
+                onPress={() =>
+                  // 클릭 시 검색 결과 화면으로 이동하며 파라미터 전달
+                  router.push({
+                    pathname: "/results",
+                    // 💡 저장된 데이터 키값에 맞춰 수정하세요 (depStation vs from)
+                    params: {
+                      from: route.depStation || route.from,
+                      to: route.arrStation || route.to,
+                    },
+                  })
+                }
+                style={styles.card}
+              >
+                {/* 카드 상단 */}
+                <View style={styles.cardHeader}>
+                  <View>
+                    <Text style={styles.routeName}>
+                      {route.name || "저장된 경로"}
+                    </Text>
+                    <View style={styles.routeRow}>
+                      {/* 💡 데이터 필드명 매핑 (depStation이 없으면 from 사용) */}
+                      <Text style={styles.routeStation}>
+                        {route.depStation || route.from}
+                      </Text>
+                      <ChevronRight size={14} color="#9CA3AF" />
+                      <Text style={styles.routeStation}>
+                        {route.arrStation || route.to}
+                      </Text>
+                    </View>
                   </View>
+                  {/* 혼잡도 데이터가 아직 없으므로 기본값 설정 */}
+                  <CongestionBadge level={route.congestion || "medium"} />
                 </View>
-                <CongestionBadge level={route.congestion} />
-              </View>
 
-              <View style={styles.divider} />
+                <View style={styles.divider} />
 
-              {/* 카드 하단 */}
-              <View style={styles.cardFooter}>
-                <View style={styles.timeTag}>
-                  <MapPin size={12} color="#2563EB" />
-                  <Text style={styles.timeTagText}>지금 출발 시</Text>
+                {/* 카드 하단 */}
+                <View style={styles.cardFooter}>
+                  <View style={styles.timeTag}>
+                    <MapPin size={12} color="#2563EB" />
+                    <Text style={styles.timeTagText}>지금 출발 시</Text>
+                  </View>
+                  <Text style={styles.durationText}>
+                    약{" "}
+                    <Text style={styles.durationHighlight}>
+                      {route.time || "--"}분
+                    </Text>
+                  </Text>
                 </View>
-                <Text style={styles.durationText}>
-                  약{" "}
-                  <Text style={styles.durationHighlight}>{route.time}분</Text>
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            ))
+          )}
 
           {/* 추가 버튼 */}
           <TouchableOpacity
@@ -187,7 +210,7 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
 
-  // 히어로 섹션 (배경 및 검색창)
+  // 히어로 섹션
   heroSection: {
     backgroundColor: "white",
     paddingHorizontal: 24,
@@ -233,7 +256,7 @@ const styles = StyleSheet.create({
   },
   greetingMain: { fontSize: 28, color: "#111827", fontWeight: "800" },
 
-  // 🔥 대형 검색창 스타일
+  // 검색창
   bigSearchBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -241,7 +264,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderRadius: 24,
-    // 그림자를 진하게 줘서 떠있는 느낌 강조
     shadowColor: "#2563EB",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
@@ -271,6 +293,19 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 20, fontWeight: "700", color: "#111827" },
   viewAll: { fontSize: 14, fontWeight: "600", color: "#2563EB" },
   cardList: { gap: 16 },
+
+  // 💡 [추가] 빈 상태 스타일
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    marginBottom: 10,
+  },
+  emptyText: {
+    color: "#9CA3AF",
+    fontSize: 14,
+  },
+
   card: {
     backgroundColor: "white",
     padding: 20,

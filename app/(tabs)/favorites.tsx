@@ -1,6 +1,6 @@
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router"; // 💡 useFocusEffect 추가
 import { ChevronRight, Edit, Plus, Star, Trash2 } from "lucide-react-native";
-import React, { useState } from "react";
+import { useCallback, useState } from "react"; // 💡 useCallback 추가
 import {
   Alert,
   ScrollView,
@@ -12,25 +12,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// 1. 가짜 데이터 (에러 방지용)
-const initialRoutes = [
-  {
-    id: "1",
-    name: "출근길 (최적)",
-    from: "건대입구",
-    to: "강남",
-    congestion: "low",
-  },
-  {
-    id: "2",
-    name: "학교 가는 길",
-    from: "잠실",
-    to: "건대입구",
-    congestion: "medium",
-  },
-];
+// 💡 저장소 함수 가져오기 (경로가 맞는지 확인해 주세요!)
+import { getFavorites, removeFavorite } from "../../utils/storage";
 
-// 2. 헬퍼 함수
+// 헬퍼 함수 (그대로 유지)
 const getCongestionInfo = (level: string) => {
   switch (level) {
     case "low":
@@ -46,16 +31,38 @@ const getCongestionInfo = (level: string) => {
 
 export default function FavoritesScreen() {
   const router = useRouter();
-  const [routes, setRoutes] = useState(initialRoutes);
+
+  // 💡 [변경] 초기값을 빈 배열로 설정 (이제 가짜 데이터 안 씀)
+  const [routes, setRoutes] = useState<any[]>([]);
   const [editMode, setEditMode] = useState(false);
 
+  // 💡 [추가] 화면이 포커스될 때마다(탭 누를 때마다) 데이터 불러오기
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, []),
+  );
+
+  const loadData = async () => {
+    try {
+      const data = await getFavorites();
+      setRoutes(data || []);
+    } catch (e) {
+      console.error("불러오기 실패:", e);
+    }
+  };
+
+  // 💡 [변경] 실제 삭제 로직 연결
   const handleDelete = (id: string) => {
     Alert.alert("삭제", "정말 삭제하시겠습니까?", [
       { text: "취소", style: "cancel" },
       {
         text: "삭제",
         style: "destructive",
-        onPress: () => setRoutes(routes.filter((r) => r.id !== id)),
+        onPress: async () => {
+          await removeFavorite(id); // 1. 저장소에서 삭제
+          await loadData(); // 2. 목록 다시 불러오기
+        },
       },
     ]);
   };
@@ -67,14 +74,17 @@ export default function FavoritesScreen() {
       {/* 헤더 */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>즐겨찾기</Text>
-        <TouchableOpacity
-          onPress={() => setEditMode(!editMode)}
-          style={styles.editButton}
-        >
-          <Text style={styles.editButtonText}>
-            {editMode ? "완료" : "편집"}
-          </Text>
-        </TouchableOpacity>
+        {/* 데이터가 있을 때만 편집 버튼 표시 */}
+        {routes.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setEditMode(!editMode)}
+            style={styles.editButton}
+          >
+            <Text style={styles.editButtonText}>
+              {editMode ? "완료" : "편집"}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView
@@ -100,10 +110,14 @@ export default function FavoritesScreen() {
         ) : (
           // 즐겨찾기 리스트
           <View style={styles.listContainer}>
-            {routes.map((route) => {
-              const congestion = getCongestionInfo(route.congestion);
+            {routes.map((route, index) => {
+              // 저장된 데이터가 없을 경우를 대비한 기본값 처리
+              const congestion = getCongestionInfo(
+                route.congestion || "medium",
+              );
+
               return (
-                <View key={route.id} style={styles.card}>
+                <View key={route.id || index} style={styles.card}>
                   {/* 삭제 버튼 (편집 모드) */}
                   {editMode && (
                     <TouchableOpacity
@@ -120,7 +134,11 @@ export default function FavoritesScreen() {
                     onPress={() =>
                       router.push({
                         pathname: "/results",
-                        params: { from: route.from, to: route.to },
+                        // 💡 데이터 키값 매핑 (depStation/arrStation이 실제 저장값일 확률 높음)
+                        params: {
+                          from: route.depStation || route.from,
+                          to: route.arrStation || route.to,
+                        },
                       })
                     }
                   >
@@ -133,7 +151,9 @@ export default function FavoritesScreen() {
                             fill="#F59E0B"
                             style={{ marginRight: 6 }}
                           />
-                          <Text style={styles.cardTitle}>{route.name}</Text>
+                          <Text style={styles.cardTitle}>
+                            {route.name || "저장된 경로"}
+                          </Text>
                           {editMode && (
                             <Edit
                               size={14}
@@ -143,9 +163,13 @@ export default function FavoritesScreen() {
                           )}
                         </View>
                         <View style={styles.routeRow}>
-                          <Text style={styles.stationText}>{route.from}</Text>
+                          <Text style={styles.stationText}>
+                            {route.depStation || route.from}
+                          </Text>
                           <ChevronRight size={14} color="#9CA3AF" />
-                          <Text style={styles.stationText}>{route.to}</Text>
+                          <Text style={styles.stationText}>
+                            {route.arrStation || route.to}
+                          </Text>
                         </View>
                       </View>
 
@@ -172,7 +196,9 @@ export default function FavoritesScreen() {
                     {!editMode && (
                       <View style={styles.cardFooter}>
                         <Text style={styles.footerLabel}>지금 출발하면</Text>
-                        <Text style={styles.footerValue}>약 25분</Text>
+                        <Text style={styles.footerValue}>
+                          약 {route.time || 25}분
+                        </Text>
                       </View>
                     )}
                   </TouchableOpacity>
