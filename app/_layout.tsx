@@ -1,6 +1,8 @@
+/**
+ * 루트 레이아웃
+ */
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler"; // 👈 임포트 확인
-import "../global.css"; // 스타일 파일 불러오기 (한 번만)
 
 export default function RootLayout() {
   return (

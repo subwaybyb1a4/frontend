@@ -1,3 +1,6 @@
+/**
+ * 홈 화면
+ */
 import { useFocusEffect, useRouter } from "expo-router"; // 💡 useFocusEffect 추가
 import {
   Bell,

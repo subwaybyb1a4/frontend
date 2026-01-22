@@ -7,12 +7,14 @@ import {
 } from "lucide-react-native";
 import React, { useState } from "react";
 import {
+  Keyboard,
   SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View
 } from "react-native";
 
@@ -45,6 +47,7 @@ export default function SearchScreen() {
       setTo(stationName);
       setSearchMode(null);
     }
+    Keyboard.dismiss();
   };
 
   const handleSearch = () => {
@@ -56,9 +59,19 @@ export default function SearchScreen() {
     }
   };
 
+  const handleDismiss = () => {
+    if (from && to) {
+      handleSearch();
+    } else {
+      Keyboard.dismiss();
+      setSearchMode(null);
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+    <TouchableWithoutFeedback onPress={handleDismiss} accessible={false}>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" />
 
       {/* 헤더 */}
       <View style={styles.header}>
@@ -86,6 +99,8 @@ export default function SearchScreen() {
                 setSearchMode("from");
               }}
               onFocus={() => setSearchMode("from")}
+              onSubmitEditing={handleDismiss}
+              returnKeyType="done"
               placeholder="출발역 입력"
               style={styles.input}
               placeholderTextColor="#9CA3AF"
@@ -106,6 +121,8 @@ export default function SearchScreen() {
                 setSearchMode("to");
               }}
               onFocus={() => setSearchMode("to")}
+              onSubmitEditing={handleDismiss}
+              returnKeyType="search"
               placeholder="도착역 입력"
               style={styles.input}
               placeholderTextColor="#9CA3AF"
@@ -151,7 +168,8 @@ export default function SearchScreen() {
           <Text style={styles.searchButtonText}>경로 검색하기</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </TouchableWithoutFeedback>
   );
 }
 

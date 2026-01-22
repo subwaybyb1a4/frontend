@@ -1,3 +1,6 @@
+/**
+ * 즐겨찾기 화면
+ */
 import { useFocusEffect, useRouter } from "expo-router"; // 💡 useFocusEffect 추가
 import { ChevronRight, Edit, Plus, Star, Trash2 } from "lucide-react-native";
 import { useCallback, useState } from "react"; // 💡 useCallback 추가
