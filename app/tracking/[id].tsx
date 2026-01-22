@@ -1,6 +1,6 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { MapPin, X } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   ScrollView,
@@ -19,16 +19,12 @@ import Animated, {
 import { WebView } from "react-native-webview";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-
-// 1. 패널이 숨겨진 만큼만 딱 올라오도록 수정
 const PANEL_HIDDEN_HEIGHT = SCREEN_HEIGHT * 0.4;
-const SNAP_POINTS = {
-  MIN: 0,
-  MAX: -PANEL_HIDDEN_HEIGHT, // 이제 바닥이 들리지 않습니다!
-};
+const SNAP_POINTS = { MIN: 0, MAX: -PANEL_HIDDEN_HEIGHT };
 
-// 2. 실제 2호선 경로 데이터 (건대입구 -> 강남)
-const LINE2_STATIONS = [
+// 1. 전체 경로 데이터 통합 (출발부터 도착까지)
+const FULL_ROUTE = [
+  "건대입구",
   "구의",
   "강변",
   "잠실나루",
@@ -38,16 +34,36 @@ const LINE2_STATIONS = [
   "삼성",
   "선릉",
   "역삼",
+  "강남",
 ];
 
 export default function TrackingScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const [currentStation] = useState(params.startStation || "건대입구");
+  const scrollViewRef = useRef<ScrollView>(null);
 
+  // 2. 현재 역의 위치를 관리하는 핵심 상태 (Index)
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // 3. [시뮬레이션] 5초마다 다음 역으로 이동
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => {
+        if (prev < FULL_ROUTE.length - 1) return prev + 1;
+        clearInterval(interval);
+        return prev;
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 현재 및 다음 역 계산
+  const currentStation = FULL_ROUTE[currentIndex];
+  const nextStation = FULL_ROUTE[currentIndex + 1] || "목적지";
+  const progress = (currentIndex / (FULL_ROUTE.length - 1)) * 100;
+
+  // 바텀시트 애니메이션 로직
   const translateY = useSharedValue(0);
   const context = useSharedValue(0);
-
   const panGesture = Gesture.Pan()
     .onStart(() => {
       context.value = translateY.value;
@@ -77,7 +93,7 @@ export default function TrackingScreen() {
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script>
-          var map = L.map('map', { zoomControl: false }).setView([37.5404, 127.0692], 16);
+          var map = L.map('map', { zoomControl: false }).setView([37.5404, 127.0692], 15);
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         </script>
       </body>
@@ -87,6 +103,8 @@ export default function TrackingScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
+
+      {/* 지도 영역 */}
       <View style={styles.mapContainer}>
         <WebView
           source={{ html: mapHtml }}
@@ -101,60 +119,92 @@ export default function TrackingScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* 정보 패널 (바텀시트) */}
       <GestureDetector gesture={panGesture}>
         <Animated.View style={[styles.infoPanel, animatedSheetStyle]}>
           <View style={styles.handleBarContainer}>
             <View style={styles.handleBar} />
           </View>
 
+          {/* 상단 현재 상태 박스: 실시간 반영 */}
           <View style={styles.currentStatusBox}>
-            <Text style={styles.statusLabel}>현재 위치</Text>
+            <Text style={styles.statusLabel}>현재 실시간 위치</Text>
             <View style={styles.stationRow}>
               <Text style={styles.stationNameBig}>{currentStation}</Text>
-              <Text style={styles.stationSuffix}>역 진입 중</Text>
+              <Text style={styles.stationSuffix}>
+                {currentIndex === FULL_ROUTE.length - 1 ? "도착" : "역 진입 중"}
+              </Text>
             </View>
+
+            {/* 실시간 진행 바 */}
             <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: "60%" }]} />
+              <Animated.View
+                style={[styles.progressFill, { width: `${progress}%` }]}
+              />
             </View>
-            <Text style={styles.nextInfo}>다음역 성수까지 1분 30초</Text>
+
+            <View style={styles.nextInfoRow}>
+              <Text style={styles.nextInfoText}>다음역: {nextStation}</Text>
+              <Text style={styles.timeText}>약 2분 남음</Text>
+            </View>
           </View>
 
+          {/* 남은 경로 리스트: 실시간 하이라이트 */}
           <View style={styles.routeListContainer}>
-            <Text style={styles.listTitle}>남은 경로</Text>
+            <Text style={styles.listTitle}>운행 경로</Text>
             <ScrollView
-              style={styles.scrollView}
+              ref={scrollViewRef}
               showsVerticalScrollIndicator={false}
             >
-              {/* 출발역 */}
-              <View style={styles.stepItem}>
-                <View style={styles.stepLineContainer}>
-                  <View style={styles.stepDotActive} />
-                  <View style={styles.stepLine} />
-                </View>
-                <Text style={styles.stepTextActive}>
-                  {currentStation} (현재)
-                </Text>
-              </View>
+              {FULL_ROUTE.map((station, index) => {
+                const isCurrent = index === currentIndex;
+                const isPassed = index < currentIndex;
+                const isLast = index === FULL_ROUTE.length - 1;
 
-              {/* 중간역 리스트 자동 생성 */}
-              {LINE2_STATIONS.map((station, index) => (
-                <View key={index} style={styles.stepItem}>
-                  <View style={styles.stepLineContainer}>
-                    <View style={styles.stepDot} />
-                    <View style={styles.stepLine} />
+                return (
+                  <View key={index} style={styles.stepItem}>
+                    <View style={styles.stepLineContainer}>
+                      {/* 아이콘: 도착역은 핀, 나머지는 동그라미 */}
+                      {isLast ? (
+                        <MapPin
+                          size={20}
+                          color={isCurrent ? "#DC2626" : "#D1D5DB"}
+                          fill={isCurrent ? "#DC2626" : "transparent"}
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.stepDot,
+                            isCurrent && styles.stepDotActive,
+                            isPassed && styles.stepDotPassed,
+                          ]}
+                        />
+                      )}
+                      {/* 연결 선 */}
+                      {!isLast && (
+                        <View
+                          style={[
+                            styles.stepLine,
+                            isPassed && styles.stepLinePassed,
+                          ]}
+                        />
+                      )}
+                    </View>
+
+                    {/* 역 이름 텍스트: 상태에 따라 스타일 변경 */}
+                    <Text
+                      style={[
+                        styles.stepText,
+                        isCurrent && styles.stepTextActive,
+                        isPassed && styles.stepTextPassed,
+                      ]}
+                    >
+                      {station} {isCurrent ? "(현재)" : ""}
+                    </Text>
                   </View>
-                  <Text style={styles.stepText}>{station}</Text>
-                </View>
-              ))}
-
-              {/* 도착역 */}
-              <View style={styles.stepItem}>
-                <View style={styles.stepLineContainer}>
-                  <MapPin size={18} color="#DC2626" />
-                </View>
-                <Text style={styles.stepTextDest}>강남역 (도착)</Text>
-              </View>
-              <View style={{ height: 150 }} />
+                );
+              })}
+              <View style={{ height: 100 }} />
             </ScrollView>
           </View>
         </Animated.View>
@@ -170,106 +220,108 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 50,
     left: 20,
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     backgroundColor: "white",
-    borderRadius: 20,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    elevation: 5,
+    elevation: 8,
     zIndex: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
   },
   infoPanel: {
     position: "absolute",
-    bottom: -PANEL_HIDDEN_HEIGHT, // 숨겨진 높이만큼 배치
+    bottom: -PANEL_HIDDEN_HEIGHT,
     left: 0,
     right: 0,
     height: SCREEN_HEIGHT * 0.85,
     backgroundColor: "white",
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     paddingHorizontal: 24,
-    paddingTop: 10,
-    elevation: 20,
+    elevation: 25,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
+    shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.1,
-    shadowRadius: 10,
+    shadowRadius: 20,
   },
-  handleBarContainer: {
-    alignItems: "center",
-    paddingBottom: 20,
-    paddingTop: 5,
-  },
+  handleBarContainer: { alignItems: "center", paddingVertical: 12 },
   handleBar: {
     width: 40,
     height: 5,
     backgroundColor: "#E5E7EB",
-    borderRadius: 2.5,
+    borderRadius: 3,
   },
-  currentStatusBox: { marginBottom: 24 },
+  currentStatusBox: { marginBottom: 30 },
   statusLabel: {
     fontSize: 13,
     color: "#6B7280",
-    fontWeight: "600",
-    marginBottom: 4,
+    fontWeight: "700",
+    marginBottom: 6,
+    letterSpacing: 0.5,
   },
   stationRow: {
     flexDirection: "row",
     alignItems: "baseline",
-    gap: 6,
-    marginBottom: 12,
+    gap: 8,
+    marginBottom: 15,
   },
-  stationNameBig: { fontSize: 32, fontWeight: "800", color: "#111827" },
-  stationSuffix: { fontSize: 18, color: "#4B5563", fontWeight: "600" },
+  stationNameBig: { fontSize: 36, fontWeight: "900", color: "#111827" },
+  stationSuffix: { fontSize: 18, color: "#3B82F6", fontWeight: "700" },
   progressBar: {
-    height: 8,
+    height: 10,
     backgroundColor: "#F3F4F6",
-    borderRadius: 4,
-    marginBottom: 8,
+    borderRadius: 5,
+    marginBottom: 10,
     overflow: "hidden",
   },
-  progressFill: { height: "100%", backgroundColor: "#2563EB" },
-  nextInfo: {
-    fontSize: 14,
-    color: "#2563EB",
-    fontWeight: "700",
-    textAlign: "right",
+  progressFill: { height: "100%", backgroundColor: "#3B82F6" },
+  nextInfoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
+  nextInfoText: { fontSize: 15, color: "#4B5563", fontWeight: "600" },
+  timeText: { fontSize: 15, color: "#3B82F6", fontWeight: "700" },
   routeListContainer: { flex: 1 },
   listTitle: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#1F2937",
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  scrollView: { flex: 1 },
-  stepItem: { flexDirection: "row", alignItems: "flex-start", height: 55 },
-  stepLineContainer: { width: 24, alignItems: "center", marginRight: 12 },
-  stepDotActive: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#2563EB",
+  stepItem: { flexDirection: "row", alignItems: "flex-start", height: 60 },
+  stepLineContainer: { width: 30, alignItems: "center", marginRight: 15 },
+  stepDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#E5E7EB",
     zIndex: 2,
+    marginTop: 4,
+  },
+  stepDotActive: {
+    backgroundColor: "#3B82F6",
     borderWidth: 3,
     borderColor: "#DBEAFE",
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginTop: 2,
   },
-  stepDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#E5E7EB",
-    zIndex: 2,
-  },
+  stepDotPassed: { backgroundColor: "#93C5FD" },
   stepLine: {
     width: 2,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: "#F3F4F6",
     height: "100%",
     position: "absolute",
-    top: 12,
+    top: 15,
   },
-  stepTextActive: { fontSize: 17, color: "#2563EB", fontWeight: "800" },
-  stepText: { fontSize: 16, color: "#4B5563", fontWeight: "500" },
-  stepTextDest: { fontSize: 17, color: "#DC2626", fontWeight: "800" },
+  stepLinePassed: { backgroundColor: "#DBEAFE" },
+  stepText: { fontSize: 16, color: "#9CA3AF", fontWeight: "500" },
+  stepTextActive: { fontSize: 18, color: "#1D4ED8", fontWeight: "800" },
+  stepTextPassed: { color: "#4B5563", fontWeight: "600" },
 });
