@@ -1,3 +1,6 @@
+/**
+ * 설정 화면
+ */
 import Slider from "@react-native-community/slider";
 import {
   Footprints,

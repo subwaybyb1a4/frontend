@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, ChevronRight } from "lucide-react-native";
-import React from "react";
+import { ArrowLeft, ChevronRight, Star } from "lucide-react-native";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { addFavorite, getFavorites, removeFavorite } from "../utils/storage";
 
 // 1. 데이터 (요금 정보 없음)
 const allRoutes = [
@@ -59,6 +61,16 @@ const allRoutes = [
 export default function RouteResults() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  const fromStation = String(params.from || "건대입구");
+  const toStation = String(params.to || "강남");
+  const favoriteId = `search:${fromStation}:${toStation}`;
+
+  const primaryRoute = useMemo(() => {
+    const fastest = allRoutes.find((route) => route.type === "fastest");
+    return fastest || allRoutes[0];
+  }, []);
 
   // 메인 태그 스타일 함수
   const getTagStyle = (type: string) => {
@@ -108,6 +120,44 @@ export default function RouteResults() {
     }
   };
 
+  const checkFavoriteStatus = async () => {
+    try {
+      const favorites = await getFavorites();
+      const exists = favorites.find((r: any) => r.id === favoriteId);
+      setIsFavorite(!!exists);
+    } catch (e) {
+      console.log("즐겨찾기 확인 에러:", e);
+    }
+  };
+
+  const toggleFavorite = async () => {
+    try {
+      if (isFavorite) {
+        await removeFavorite(favoriteId);
+        setIsFavorite(false);
+        Alert.alert("삭제됨", "즐겨찾기에서 삭제되었습니다.");
+      } else {
+        const newRoute = {
+          id: favoriteId,
+          name: `${fromStation} → ${toStation}`,
+          from: fromStation,
+          to: toStation,
+          time: primaryRoute?.totalTime || 25,
+          congestion: primaryRoute?.congestion || "medium",
+        };
+        await addFavorite(newRoute);
+        setIsFavorite(true);
+        Alert.alert("저장됨", "즐겨찾는 경로에 추가가 완료되었습니다.");
+      }
+    } catch (e) {
+      console.log("즐겨찾기 저장 에러:", e);
+    }
+  };
+
+  useEffect(() => {
+    checkFavoriteStatus();
+  }, [favoriteId]);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -121,15 +171,22 @@ export default function RouteResults() {
         </TouchableOpacity>
         <View style={styles.routeInfo}>
           <View style={styles.routeTextRow}>
-            <Text style={styles.stationText}>{params.from || "건대입구"}</Text>
+            <Text style={styles.stationText}>{fromStation}</Text>
             <ArrowLeft
               size={16}
               color="#9CA3AF"
               style={{ transform: [{ rotate: "180deg" }], marginHorizontal: 8 }}
             />
-            <Text style={styles.stationText}>{params.to || "강남"}</Text>
+            <Text style={styles.stationText}>{toStation}</Text>
           </View>
         </View>
+        <TouchableOpacity onPress={toggleFavorite} style={styles.starButton}>
+          <Star
+            size={24}
+            color={isFavorite ? "#F59E0B" : "#D1D5DB"}
+            fill={isFavorite ? "#F59E0B" : "transparent"}
+          />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -264,8 +321,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 40,
   },
+  starButton: { padding: 8 },
   stationText: { fontSize: 18, fontWeight: "700", color: "#111827" },
 
   content: { flex: 1, padding: 16 },

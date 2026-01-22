@@ -1,8 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, Star } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { ArrowLeft } from "lucide-react-native";
 import {
-  Alert,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -11,57 +9,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { addFavorite, getFavorites, removeFavorite } from "../../utils/storage";
 
 export default function RouteDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const [isFavorite, setIsFavorite] = useState(false);
-
-  // 화면 들어올 때 즐겨찾기 상태 확인
-  useEffect(() => {
-    if (params.id) {
-      checkFavoriteStatus();
-    }
-  }, [params.id]);
-
-  const checkFavoriteStatus = async () => {
-    try {
-      const favorites = await getFavorites();
-      // id 비교 시 문자열로 변환하여 비교 (안전장치)
-      const exists = favorites.find(
-        (r: any) => String(r.id) === String(params.id),
-      );
-      setIsFavorite(!!exists);
-    } catch (e) {
-      console.log("즐겨찾기 확인 에러:", e);
-    }
-  };
-
-  const toggleFavorite = async () => {
-    if (!params.id) return; // ID 없으면 무시
-
-    try {
-      if (isFavorite) {
-        await removeFavorite(params.id as string);
-        setIsFavorite(false);
-        // Alert.alert("삭제됨", "즐겨찾기에서 삭제했습니다.");
-      } else {
-        const newRoute = {
-          id: params.id as string,
-          name: `${params.from} → ${params.to}`,
-          from: params.from as string,
-          to: params.to as string,
-          time: params.totalTime || 25,
-        };
-        await addFavorite(newRoute);
-        setIsFavorite(true);
-        Alert.alert("저장됨", "메인 화면 즐겨찾기에 추가되었습니다!");
-      }
-    } catch (e) {
-      Alert.alert("오류", "저장에 실패했습니다.");
-    }
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -76,13 +27,6 @@ export default function RouteDetailScreen() {
           <ArrowLeft size={26} color="#1F2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>상세 경로 정보</Text>
-        <TouchableOpacity onPress={toggleFavorite} style={styles.starButton}>
-          <Star
-            size={30}
-            color={isFavorite ? "#F59E0B" : "#D1D5DB"}
-            fill={isFavorite ? "#F59E0B" : "transparent"}
-          />
-        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -261,7 +205,6 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
   },
   backButton: { padding: 4 },
-  starButton: { padding: 4 },
   headerTitle: { fontSize: 20, fontWeight: "700", color: "#111827" },
   content: { padding: 16 },
   miniSummary: {
