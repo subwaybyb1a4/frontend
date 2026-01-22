@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { MapPin, Navigation, X } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
    Dimensions,
    ScrollView,
@@ -10,40 +10,89 @@ import {
    TouchableOpacity,
    View,
 } from "react-native";
+// 1. WebView 임포트
+import { WebView } from "react-native-webview";
 
 const { width } = Dimensions.get("window");
 
 export default function TrackingScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams(); // 넘겨받은 경로 데이터
+  const params = useLocalSearchParams();
 
-  // 가짜 진행 상황 (시간 지나면 다음 역으로 넘어가는 척)
-  const [currentStation, setCurrentStation] = useState("건대입구");
-  const [nextStation, setNextStation] = useState("성수");
+  // 1. 초기값을 params에서 받아오거나 기본값으로 설정
+  const [currentStation, setCurrentStation] = useState(
+    params.startStation || "건대입구",
+  );
+  const [nextStation, setNextStation] = useState(params.nextStation || "성수");
+  const [progress, setProgress] = useState("60%"); // 진행바 상태 추가
+
+  // 2. 실시간 시뮬레이션 효과 추가
+  useEffect(() => {
+    // 5초 뒤에 역 정보를 업데이트합니다.
+    const timer = setTimeout(() => {
+      setCurrentStation("성수");
+      setNextStation("뚝섬");
+      setProgress("20%"); // 다음 역으로 넘어갔으니 진행바 초기화 시뮬레이션
+    }, 5000);
+
+    return () => clearTimeout(timer); // 메모리 누수 방지
+  }, []);
+
+  // 2. 지도를 띄울 간단한 HTML 코드 (OpenStreetMap 사용)
+  const mapHtml = `
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+          body { margin: 0; padding: 0; }
+          #map { height: 100vh; width: 100vw; }
+          .leaflet-control-attribution { display: none; }
+        </style>
+      </head>
+      <body>
+        <div id="map"></div>
+        <script>
+          // 건대입구역 좌표 설정
+          var map = L.map('map', { zoomControl: false }).setView([37.5404, 127.0692], 16);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        </script>
+      </body>
+    </html>
+  `;
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
-      {/* 1. 지도 영역 (상단 60%) */}
+      {/* 1. 지도 영역 (WebView로 실제 지도 구현).tsx] */}
       <View style={styles.mapContainer}>
-        {/* 실제 지도가 들어갈 자리 (임시 디자인) */}
-        <View style={styles.mapPlaceholder}>
-          <View style={styles.mapRoad} />
-          <View style={styles.mapRoadVertical} />
+        <WebView
+          source={{ html: mapHtml }}
+          style={StyleSheet.absoluteFillObject}
+          scrollEnabled={false} // 지도 위에서 스크롤 방지 (선택 사항)
+        />
 
-          {/* 내 위치 마커 (지도 중앙) */}
-          <View style={styles.myLocationMarker}>
-            <View style={styles.markerCircle}>
-              <Navigation size={24} color="white" fill="white" />
-            </View>
-            <View style={styles.markerPulse} />
+        {/* 기존의 내 위치 마커를 지도 위에 겹쳐서 표시.tsx] */}
+        <View
+          style={[
+            styles.myLocationMarker,
+            {
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              marginLeft: -24,
+              marginTop: -24,
+            },
+          ]}
+        >
+          <View style={styles.markerCircle}>
+            <Navigation size={24} color="white" fill="white" />
           </View>
-
-          <Text style={styles.mapText}>지도 뷰 (Map View)</Text>
+          <View style={styles.markerPulse} />
         </View>
 
-        {/* 안내 종료 버튼 (지도 위에 둥둥 떠있음) */}
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.closeButton}
@@ -52,14 +101,12 @@ export default function TrackingScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 2. 하단 정보 패널 (하단 40%) */}
+      {/* 2. 하단 정보 패널 (기존 디자인 유지).tsx] */}
       <View style={styles.infoPanel}>
-        {/* 핸들바 (위로 드래그 가능한 느낌) */}
         <View style={styles.handleBarContainer}>
           <View style={styles.handleBar} />
         </View>
 
-        {/* 2-1. 현재 위치 (어디 역인지) */}
         <View style={styles.currentStatusBox}>
           <Text style={styles.statusLabel}>현재 위치</Text>
           <View style={styles.stationRow}>
@@ -72,34 +119,13 @@ export default function TrackingScreen() {
           <Text style={styles.nextInfo}>다음역 {nextStation}까지 1분 30초</Text>
         </View>
 
-        {/* 2-2. 남은 경로 리스트 */}
         <View style={styles.routeListContainer}>
           <Text style={styles.listTitle}>남은 경로</Text>
           <ScrollView
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
           >
-            {/* 지나온 역 (흐리게) */}
-            <View style={styles.stepItem}>
-              <View style={styles.stepLineContainer}>
-                <View
-                  style={[styles.stepDot, { backgroundColor: "#E5E7EB" }]}
-                />
-                <View
-                  style={[styles.stepLine, { backgroundColor: "#E5E7EB" }]}
-                />
-              </View>
-              <Text
-                style={[
-                  styles.stepText,
-                  { color: "#9CA3AF", textDecorationLine: "line-through" },
-                ]}
-              >
-                구의역
-              </Text>
-            </View>
-
-            {/* 현재 역 (강조) */}
+            {/* 현재 역 표시.tsx] */}
             <View style={styles.stepItem}>
               <View style={styles.stepLineContainer}>
                 <View
@@ -123,49 +149,11 @@ export default function TrackingScreen() {
                   { color: "#2563EB", fontWeight: "700" },
                 ]}
               >
-                건대입구역 (현재)
+                {currentStation}역 (현재)
               </Text>
             </View>
 
-            {/* 다음 역들 */}
-            <View style={styles.stepItem}>
-              <View style={styles.stepLineContainer}>
-                <View
-                  style={[
-                    styles.stepDot,
-                    {
-                      borderColor: "#2563EB",
-                      borderWidth: 2,
-                      backgroundColor: "white",
-                    },
-                  ]}
-                />
-                <View
-                  style={[styles.stepLine, { backgroundColor: "#E5E7EB" }]}
-                />
-              </View>
-              <Text style={styles.stepText}>성수역</Text>
-            </View>
-
-            <View style={styles.stepItem}>
-              <View style={styles.stepLineContainer}>
-                <View
-                  style={[
-                    styles.stepDot,
-                    {
-                      borderColor: "#9CA3AF",
-                      borderWidth: 2,
-                      backgroundColor: "white",
-                    },
-                  ]}
-                />
-                <View
-                  style={[styles.stepLine, { backgroundColor: "#E5E7EB" }]}
-                />
-              </View>
-              <Text style={styles.stepText}>뚝섬역</Text>
-            </View>
-
+            {/* 도착역 표시.tsx] */}
             <View style={styles.stepItem}>
               <View style={styles.stepLineContainer}>
                 <MapPin size={16} color="#DC2626" style={{ marginLeft: -2 }} />
@@ -179,8 +167,6 @@ export default function TrackingScreen() {
                 강남역 (도착)
               </Text>
             </View>
-
-            {/* 여백 확보용 */}
             <View style={{ height: 50 }} />
           </ScrollView>
         </View>
@@ -189,37 +175,11 @@ export default function TrackingScreen() {
   );
 }
 
+// 기존 스타일 유지.tsx]
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#E5E7EB" }, // 지도 배경색 느낌
-
-  // 1. 지도 영역
-  mapContainer: { flex: 1.5, position: "relative" }, // 상단 비율 1.5
-  mapPlaceholder: {
-    flex: 1,
-    backgroundColor: "#E5E7EB",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  mapText: { marginTop: 10, color: "#9CA3AF", fontWeight: "600" },
-  // 지도 꾸미기용 (도로 느낌)
-  mapRoad: {
-    position: "absolute",
-    width: "200%",
-    height: 20,
-    backgroundColor: "white",
-    transform: [{ rotate: "-30deg" }],
-  },
-  mapRoadVertical: {
-    position: "absolute",
-    width: 20,
-    height: "200%",
-    backgroundColor: "white",
-    left: "30%",
-  },
-
-  // 내 위치 마커
-  myLocationMarker: { alignItems: "center", justifyContent: "center" },
+  container: { flex: 1, backgroundColor: "#F9FAFB" },
+  mapContainer: { flex: 1.5, position: "relative" },
+  myLocationMarker: { zIndex: 5 },
   markerCircle: {
     width: 48,
     height: 48,
@@ -241,7 +201,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(37, 99, 235, 0.2)",
     zIndex: 1,
   },
-
   closeButton: {
     position: "absolute",
     top: 50,
@@ -252,14 +211,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     elevation: 3,
+    zIndex: 10,
   },
-
-  // 2. 하단 정보 패널
   infoPanel: {
     flex: 1,
     backgroundColor: "white",
@@ -267,13 +221,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 30,
     paddingHorizontal: 24,
     paddingTop: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
     elevation: 10,
   },
-
   handleBarContainer: { alignItems: "center", marginBottom: 20 },
   handleBar: {
     width: 40,
@@ -281,8 +230,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#E5E7EB",
     borderRadius: 2,
   },
-
-  // 2-1. 현재 위치 박스
   currentStatusBox: { marginBottom: 24 },
   statusLabel: {
     fontSize: 13,
@@ -298,7 +245,6 @@ const styles = StyleSheet.create({
   },
   stationNameBig: { fontSize: 28, fontWeight: "800", color: "#111827" },
   stationSuffix: { fontSize: 18, color: "#4B5563", fontWeight: "500" },
-
   progressBar: {
     height: 6,
     backgroundColor: "#F3F4F6",
@@ -313,8 +259,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "right",
   },
-
-  // 2-2. 남은 경로 리스트
   routeListContainer: { flex: 1 },
   listTitle: {
     fontSize: 16,
@@ -323,16 +267,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   scrollView: { flex: 1 },
-
-  stepItem: { flexDirection: "row", alignItems: "flex-start", height: 44 }, // 각 스텝 높이
+  stepItem: { flexDirection: "row", alignItems: "flex-start", height: 44 },
   stepLineContainer: { width: 20, alignItems: "center", marginRight: 12 },
-  stepDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#E5E7EB",
-    zIndex: 2,
-  },
+  stepDot: { width: 10, height: 10, borderRadius: 5, zIndex: 2 },
   stepLine: {
     width: 2,
     backgroundColor: "#E5E7EB",
