@@ -1,7 +1,8 @@
-import "../global.css";
-
+/**
+ * 루트 레이아웃
+ */
 import { Stack } from "expo-router";
-import "../global.css"; // 스타일 파일 불러오기
+// import "../global.css"; // 스타일 파일 불러오기
 
 export default function RootLayout() {
   return (
