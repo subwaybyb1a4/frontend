@@ -5,7 +5,6 @@ import { useFocusEffect, useRouter } from "expo-router"; // 💡 useFocusEffect 
 import {
   Bell,
   ChevronRight,
-  MapPin,
   Navigation,
   Search,
   Star,
@@ -172,24 +171,6 @@ export default function Home() {
                       </Text>
                     </View>
                   </View>
-                  {/* 혼잡도 데이터가 아직 없으므로 기본값 설정 */}
-                  <CongestionBadge level={route.congestion || "medium"} />
-                </View>
-
-                <View style={styles.divider} />
-
-                {/* 카드 하단 */}
-                <View style={styles.cardFooter}>
-                  <View style={styles.timeTag}>
-                    <MapPin size={12} color="#2563EB" />
-                    <Text style={styles.timeTagText}>지금 출발 시</Text>
-                  </View>
-                  <Text style={styles.durationText}>
-                    약{" "}
-                    <Text style={styles.durationHighlight}>
-                      {route.time || "--"}분
-                    </Text>
-                  </Text>
                 </View>
               </TouchableOpacity>
             ))
