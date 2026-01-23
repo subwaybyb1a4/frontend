@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// 🎨 노선별 공식 색상 정의
+// 🎨 노선별 공식 색상 정의 (1호선 ~ 9호선)
 const getLineColor = (line: string) => {
   if (line.includes("1호선")) return "#0052A4";
   if (line.includes("2호선")) return "#3CB44A";
@@ -31,8 +31,9 @@ export default function RouteDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
-  const from = String(params.from || "출발역");
-  const to = String(params.to || "도착역");
+  // 사용자가 검색한 실제 역 이름 연동
+  const fromName = String(params.from || "출발역");
+  const toName = String(params.to || "도착역");
 
   const [routeData, setRouteData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -41,14 +42,14 @@ export default function RouteDetailScreen() {
     const fetchDetail = async () => {
       try {
         setLoading(true);
-        // 백엔드 명세서 구조 시뮬레이션
+        // 백엔드 명세서 구조 반영 가짜 데이터
         const mockResponse = {
           total_time: params.totalTime || 27,
           transfer_count: 1,
           summary:
             "영등포구청역 환승 시 2-3번 문을 이용하면 이동 거리가 가장 짧아요! 🤖",
           segments: [
-            { type: "subway", label: "5호선", station: from, minutes: 12 },
+            { type: "subway", label: "5호선", station: fromName, minutes: 12 },
             {
               type: "transfer",
               label: "환승",
@@ -64,14 +65,14 @@ export default function RouteDetailScreen() {
           ],
         };
         setRouteData(mockResponse);
-      } catch (e) {
-        console.error("데이터 로드 실패:", e);
+      } catch (error) {
+        console.error("데이터 로드 실패:", error);
       } finally {
         setLoading(false);
       }
     };
     fetchDetail();
-  }, [params.id, from, to]);
+  }, [params.id, fromName, toName]);
 
   if (loading || !routeData) {
     return (
@@ -81,7 +82,6 @@ export default function RouteDetailScreen() {
     );
   }
 
-  // 데이터 추출
   const firstSubway = routeData.segments[0];
   const transfer = routeData.segments.find((s: any) => s.type === "transfer");
   const secondSubway = routeData.segments[2];
@@ -90,7 +90,7 @@ export default function RouteDetailScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
-      {/* 헤더 */}
+      {/* 헤더: 실제 역 이름 반영 */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => router.back()}
@@ -98,7 +98,9 @@ export default function RouteDetailScreen() {
         >
           <ArrowLeft size={26} color="#1F2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>상세 경로 정보</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {fromName} → {toName}
+        </Text>
         <View style={{ width: 32 }} />
       </View>
 
@@ -119,13 +121,13 @@ export default function RouteDetailScreen() {
             </View>
           </View>
           <Text style={styles.stationTitle}>
-            {from} → {to}
+            {fromName} → {toName}
           </Text>
         </View>
 
-        {/* 🗺 실시간 경로 맵 (IMG_1517 스타일 반영) */}
+        {/* 🗺 여백이 보강된 타임라인 카드 */}
         <View style={styles.mainRouteCard}>
-          {/* 1단계: 출발역 승차 */}
+          {/* 1. 출발지점 (승차) */}
           <View style={styles.node}>
             <View style={styles.nodeLeft}>
               <View
@@ -145,7 +147,7 @@ export default function RouteDetailScreen() {
             </View>
             <View style={styles.nodeRight}>
               <View style={styles.stationRow}>
-                <Text style={styles.mainStationName}>{from}</Text>
+                <Text style={styles.mainStationName}>{fromName}</Text>
                 <Text style={styles.lineSubText}>{firstSubway.label}</Text>
               </View>
               <Text style={styles.moveDetail}>
@@ -154,7 +156,7 @@ export default function RouteDetailScreen() {
             </View>
           </View>
 
-          {/* 2단계: 환승역 하차 (중요!) */}
+          {/* 2. 환승 하차 지점 */}
           <View style={styles.node}>
             <View style={styles.nodeLeft}>
               <View
@@ -163,7 +165,7 @@ export default function RouteDetailScreen() {
                   { borderColor: getLineColor(firstSubway.label) },
                 ]}
               />
-              <View style={styles.dottedLine} />
+              <View style={styles.smoothDottedLine} />
             </View>
             <View style={styles.nodeRight}>
               <Text style={styles.subStationName}>{transfer.station}</Text>
@@ -171,15 +173,16 @@ export default function RouteDetailScreen() {
             </View>
           </View>
 
-          {/* 3단계: 도보 이동 구간 */}
-          <View style={styles.node}>
+          {/* 💡 3. 환승 도보 이동 (여백 보강 지점) */}
+          <View style={[styles.node, { minHeight: 90 }]}>
             <View style={styles.nodeLeft}>
               <Footprints
                 size={20}
                 color="#9CA3AF"
                 style={{ marginVertical: 10 }}
               />
-              <View style={styles.dottedLine} />
+              {/* 점선 하단에 margin을 주어 다음 역과 떨어뜨림 */}
+              <View style={[styles.smoothDottedLine, { marginBottom: 15 }]} />
             </View>
             <View style={styles.nodeRight}>
               <View style={styles.walkInfoBox}>
@@ -190,7 +193,7 @@ export default function RouteDetailScreen() {
             </View>
           </View>
 
-          {/* 4단계: 환승역 다시 승차 */}
+          {/* 4. 환승 승차 지점: 이전 점선과 떨어져서 시작됨 */}
           <View style={styles.node}>
             <View style={styles.nodeLeft}>
               <View
@@ -219,7 +222,7 @@ export default function RouteDetailScreen() {
             </View>
           </View>
 
-          {/* 5단계: 최종 도착역 */}
+          {/* 5. 최종 목적지 도착 */}
           <View style={[styles.node, { minHeight: 0 }]}>
             <View style={styles.nodeLeft}>
               <View
@@ -232,7 +235,7 @@ export default function RouteDetailScreen() {
               </View>
             </View>
             <View style={styles.nodeRight}>
-              <Text style={styles.mainStationName}>{to}</Text>
+              <Text style={styles.mainStationName}>{toName}</Text>
               <Text style={styles.infoText}>도착 완료</Text>
             </View>
           </View>
@@ -244,7 +247,7 @@ export default function RouteDetailScreen() {
             <Text style={{ fontSize: 20 }}>🤖</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.llmTitle}>AI의 꿀팁</Text>
+            <Text style={styles.llmTitle}>AI의 쾌적 꿀팁</Text>
             <Text style={styles.llmText}>{routeData.summary}</Text>
           </View>
         </View>
@@ -254,7 +257,19 @@ export default function RouteDetailScreen() {
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.startButton}
-          onPress={() => router.push(`/tracking/${params.id}`)}
+          // 1. onPress를 추가합니다.
+          onPress={() =>
+            router.push({
+              // 2. 목적지는 tracking 폴더의 [id].tsx 화면입니다.
+              pathname: "/tracking/[id]",
+              // 3. 실제 역 이름을 바구니(params)에 담아서 보냅니다.
+              params: {
+                id: String(params.id),
+                from: fromName,
+                to: toName,
+              },
+            })
+          }
         >
           <Text style={styles.startButtonText}>이 경로로 출발하기</Text>
         </TouchableOpacity>
@@ -274,7 +289,13 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
   },
   backButton: { padding: 4 },
-  headerTitle: { fontSize: 20, fontWeight: "700", color: "#111827" },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111827",
+    flex: 1,
+    textAlign: "center",
+  },
   content: { padding: 16 },
   miniSummary: {
     backgroundColor: "white",
@@ -299,14 +320,13 @@ const styles = StyleSheet.create({
   transferBadgeText: { color: "#2563EB", fontSize: 14, fontWeight: "700" },
   stationTitle: { fontSize: 18, color: "#4B5563", fontWeight: "600" },
 
-  // 타임라인 스타일
   mainRouteCard: {
     backgroundColor: "white",
     padding: 24,
     borderRadius: 28,
     marginBottom: 16,
   },
-  node: { flexDirection: "row", minHeight: 80 },
+  node: { flexDirection: "row", minHeight: 70 },
   nodeLeft: { width: 40, alignItems: "center" },
   circle: {
     width: 28,
@@ -325,14 +345,17 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     marginVertical: 7,
   },
-  verticalLine: { width: 5, flex: 1, marginVertical: -5 },
-  dottedLine: {
-    width: 0,
+  verticalLine: { width: 4, flex: 1, marginVertical: -5 },
+
+  smoothDottedLine: {
+    width: 2,
     flex: 1,
-    borderStyle: "dotted",
+    borderStyle: "dashed",
     borderWidth: 2,
     borderColor: "#D1D5DB",
     borderRadius: 1,
+    marginVertical: -2,
+    opacity: 0.6,
   },
 
   nodeRight: { flex: 1, marginLeft: 16, paddingBottom: 20 },

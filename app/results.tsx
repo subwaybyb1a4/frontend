@@ -224,7 +224,16 @@ export default function RouteResults() {
             <TouchableOpacity
               key={route.id}
               activeOpacity={0.9}
-              onPress={() => router.push(`/detail/${route.id}`)}
+              onPress={() =>
+                router.push({
+                  pathname: "/detail/[id]",
+                  params: {
+                    id: route.id,
+                    from: fromStation,
+                    to: toStation,
+                  },
+                })
+              }
               // ✅ [수정 2] isComfort일 때 배경색 변경 없이 테두리만 적용
               style={[styles.card, isComfort && styles.comfortCardBorder]}
             >
