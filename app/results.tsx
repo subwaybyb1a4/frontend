@@ -133,24 +133,46 @@ export default function RouteResults() {
   const toggleFavorite = async () => {
     try {
       if (isFavorite) {
+        // 1. 이미 즐겨찾기인 경우: 삭제 로직
         await removeFavorite(favoriteId);
         setIsFavorite(false);
         Alert.alert("삭제됨", "즐겨찾기에서 삭제되었습니다.");
       } else {
-        const newRoute = {
-          id: favoriteId,
-          name: `${fromStation} → ${toStation}`,
-          from: fromStation,
-          to: toStation,
-          time: primaryRoute?.totalTime || 25,
-          congestion: primaryRoute?.congestion || "medium",
-        };
-        await addFavorite(newRoute);
-        setIsFavorite(true);
-        Alert.alert("저장됨", "즐겨찾는 경로에 추가가 완료되었습니다.");
+        // 2. 즐겨찾기가 아닌 경우: 별칭 입력 후 저장 로직
+        Alert.prompt(
+          "즐겨찾기 추가",
+          "이 경로의 별칭을 입력해주세요.",
+          [
+            { text: "취소", style: "cancel" },
+            {
+              text: "저장",
+              onPress: async (alias?: string) => {
+                const newRoute = {
+                  id: favoriteId,
+                  // 입력한 별칭이 없으면 "출발역 → 도착역"을 기본 이름으로 사용
+                  name:
+                    alias && alias.trim() !== ""
+                      ? alias
+                      : `${fromStation} → ${toStation}`,
+                  from: fromStation,
+                  to: toStation,
+                  // 명세서 및 UI에 필요한 실시간 정보 포함
+                  time: primaryRoute?.totalTime || 25,
+                  congestion: primaryRoute?.congestion || "medium",
+                };
+
+                await addFavorite(newRoute);
+                setIsFavorite(true);
+                Alert.alert("저장됨", "즐겨찾는 경로에 추가가 완료되었습니다.");
+              },
+            },
+          ],
+          "plain-text",
+          `${fromStation} → ${toStation}`, // 입력창에 미리 띄워둘 기본값
+        );
       }
     } catch (e) {
-      console.log("즐겨찾기 저장 에러:", e);
+      console.log("즐겨찾기 처리 중 에러:", e);
     }
   };
 

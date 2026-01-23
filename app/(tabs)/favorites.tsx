@@ -1,8 +1,8 @@
 /**
- * 즐겨찾기 화면
+ * 즐겨찾기 화면 (간격 및 크기 최적화 레이아웃)
  */
 import { useFocusEffect, useRouter } from "expo-router";
-import { ChevronRight, Edit, Plus, Star, Trash2 } from "lucide-react-native";
+import { Edit, Plus, Star, Trash2 } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import {
   Alert,
@@ -14,18 +14,17 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-// 저장소 함수 가져오기
-import { getFavorites, removeFavorite } from "../../utils/storage";
+import {
+  getFavorites,
+  removeFavorite,
+  updateFavoriteName,
+} from "../../utils/storage";
 
 export default function FavoritesScreen() {
   const router = useRouter();
-
-  // 상태 관리
   const [routes, setRoutes] = useState<any[]>([]);
   const [editMode, setEditMode] = useState(false);
 
-  // 화면이 포커스될 때마다 데이터 불러오기
   useFocusEffect(
     useCallback(() => {
       loadData();
@@ -41,7 +40,27 @@ export default function FavoritesScreen() {
     }
   };
 
-  // 즐겨찾기 삭제 로직
+  const handleEditName = (id: string, currentName: string) => {
+    Alert.prompt(
+      "별칭 수정",
+      "이 경로의 새로운 이름을 입력하세요.",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "완료",
+          onPress: async (newName?: string) => {
+            if (newName && newName.trim() !== "") {
+              await updateFavoriteName(id, newName);
+              await loadData();
+            }
+          },
+        },
+      ],
+      "plain-text",
+      currentName,
+    );
+  };
+
   const handleDelete = (id: string) => {
     Alert.alert("삭제", "정말 삭제하시겠습니까?", [
       { text: "취소", style: "cancel" },
@@ -60,7 +79,6 @@ export default function FavoritesScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
-      {/* 헤더 영역 */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>즐겨찾기</Text>
         {routes.length > 0 && (
@@ -80,13 +98,9 @@ export default function FavoritesScreen() {
         contentContainerStyle={{ paddingBottom: 40 }}
       >
         {routes.length === 0 ? (
-          // 즐겨찾기가 없을 때 표시할 화면
           <View style={styles.emptyContainer}>
             <Star size={48} color="#D1D5DB" />
             <Text style={styles.emptyTitle}>즐겨찾기가 비어있습니다</Text>
-            <Text style={styles.emptySubtitle}>
-              자주 이용하는 경로를 추가해보세요
-            </Text>
             <TouchableOpacity
               onPress={() => router.push("/search")}
               style={styles.addButtonPrimary}
@@ -96,11 +110,9 @@ export default function FavoritesScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          // 즐겨찾기 목록 리스트
           <View style={styles.listContainer}>
             {routes.map((route, index) => (
               <View key={route.id || index} style={styles.card}>
-                {/* 편집 모드일 때만 보이는 삭제 버튼 */}
                 {editMode && (
                   <TouchableOpacity
                     onPress={() => handleDelete(route.id)}
@@ -116,54 +128,45 @@ export default function FavoritesScreen() {
                   onPress={() =>
                     router.push({
                       pathname: "/results",
-                      params: {
-                        from: route.from,
-                        to: route.to,
-                      },
+                      params: { from: route.from, to: route.to },
                     })
                   }
                 >
-                  <View style={styles.cardHeader}>
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.titleRow}>
-                        <Star
-                          size={18}
-                          color="#F59E0B"
-                          fill="#F59E0B"
-                          style={{ marginRight: 6 }}
-                        />
-                        <Text style={styles.cardTitle}>
-                          {route.name || "저장된 경로"}
-                        </Text>
-                        {editMode && (
+                  <View style={styles.cardContent}>
+                    {/* 별칭 영역: 크고 굵게 강조 */}
+                    <View style={styles.titleRow}>
+                      <Star
+                        size={20}
+                        color="#F59E0B"
+                        fill="#F59E0B"
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text style={styles.cardTitle}>
+                        {route.name || "저장된 경로"}
+                      </Text>
+                      {editMode && (
+                        <TouchableOpacity
+                          onPress={() => handleEditName(route.id, route.name)}
+                        >
                           <Edit
-                            size={14}
+                            size={16}
                             color="#9CA3AF"
-                            style={{ marginLeft: 6 }}
+                            style={{ marginLeft: 8 }}
                           />
-                        )}
-                      </View>
-                      <View style={styles.routeRow}>
-                        <Text style={styles.stationText}>{route.from}</Text>
-                        <ChevronRight size={14} color="#9CA3AF" />
-                        <Text style={styles.stationText}>{route.to}</Text>
-                      </View>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {/* 경로 영역: 회색이지만 이전보다 조금 더 크게 설정 */}
+                    <View style={styles.routeSection}>
+                      <Text style={styles.stationText}>{route.from}</Text>
+                      <Text style={styles.arrowText}>{">"}</Text>
+                      <Text style={styles.stationText}>{route.to}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
               </View>
             ))}
-
-            {/* 하단 새 경로 추가 버튼 */}
-            {!editMode && (
-              <TouchableOpacity
-                onPress={() => router.push("/search")}
-                style={styles.addButtonSecondary}
-              >
-                <Plus size={20} color="#374151" />
-                <Text style={styles.addButtonSecondaryText}>새 경로 추가</Text>
-              </TouchableOpacity>
-            )}
           </View>
         )}
       </ScrollView>
@@ -196,8 +199,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 40,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
     marginTop: 40,
   },
   emptyTitle: {
@@ -205,9 +206,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#111827",
     marginTop: 16,
-    marginBottom: 8,
+    marginBottom: 24,
   },
-  emptySubtitle: { color: "#6B7280", marginBottom: 24, textAlign: "center" },
   addButtonPrimary: {
     flexDirection: "row",
     alignItems: "center",
@@ -221,8 +221,8 @@ const styles = StyleSheet.create({
   listContainer: { gap: 12 },
   card: {
     backgroundColor: "white",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 20,
     borderWidth: 1,
     borderColor: "#F3F4F6",
     shadowColor: "#000",
@@ -240,24 +240,30 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     zIndex: 10,
   },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  titleRow: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
-  cardTitle: { fontSize: 18, fontWeight: "700", color: "#1F2937" },
-  routeRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  stationText: { fontSize: 14, color: "#6B7280" },
-  addButtonSecondary: {
+  cardContent: { alignItems: "flex-start" },
+  titleRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F3F4F6",
-    padding: 16,
-    borderRadius: 16,
-    gap: 8,
-    marginTop: 8,
+    marginBottom: 10, // 💡 별칭과 경로 사이 간격을 넓힘 (기존 4 -> 10)
   },
-  addButtonSecondaryText: { color: "#374151", fontWeight: "600", fontSize: 16 },
+  cardTitle: {
+    fontSize: 22, // 💡 별칭 크기를 더 키움 (기존 20 -> 22)
+    fontWeight: "800",
+    color: "#111827",
+  },
+  routeSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 28, // 💡 정렬을 위해 왼쪽 여백 조정
+  },
+  stationText: {
+    fontSize: 16, // 💡 경로 글씨 크기를 키움 (기존 14 -> 16)
+    color: "#9CA3AF",
+    fontWeight: "400",
+  },
+  arrowText: {
+    fontSize: 14, // 💡 화살표 크기 비례 조정
+    color: "#D1D5DB",
+    marginHorizontal: 8,
+  },
 });

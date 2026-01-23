@@ -30,6 +30,21 @@ export const addFavorite = async (route: any) => {
   }
 };
 
+// 즐겨찾기 이름 수정하기
+export const updateFavoriteName = async (id: string, newName: string) => {
+  try {
+    const current = await getFavorites(); // 1. 전체 목록 가져오기
+    const updated = current.map(
+      (r: any) => (r.id === id ? { ...r, name: newName } : r), // 2. ID가 일치하는 항목의 이름만 변경
+    );
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); // 3. 갱신된 목록 저장
+    return updated;
+  } catch (e) {
+    console.error("이름 수정 실패:", e);
+    return [];
+  }
+};
+
 // 즐겨찾기 삭제하기
 export const removeFavorite = async (routeId: string) => {
   try {

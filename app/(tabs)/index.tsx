@@ -1,15 +1,15 @@
 /**
- * 홈 화면
+ * 홈 화면 (즐겨찾기 디자인 통일 버전)
  */
-import { useFocusEffect, useRouter } from "expo-router"; // 💡 useFocusEffect 추가
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   Bell,
   ChevronRight,
   Navigation,
   Search,
-  Star,
+  Star
 } from "lucide-react-native";
-import { useCallback, useState } from "react"; // 💡 useState, useCallback 추가
+import { useCallback, useState } from "react";
 import {
   ScrollView,
   StatusBar,
@@ -20,49 +20,20 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// 💡 저장소 함수 가져오기 (경로가 다르다면 수정 필요)
+// 저장소 함수 가져오기
 import { getFavorites } from "../../utils/storage";
-
-// 혼잡도 뱃지 컴포넌트 (그대로 유지)
-const CongestionBadge = ({ level }: { level: string }) => {
-  let bg = "#F3F4F6";
-  let text = "#4B5563";
-  let label = "보통";
-
-  if (level === "low") {
-    bg = "#DCFCE7";
-    text = "#15803D";
-    label = "여유 😌";
-  } else if (level === "medium") {
-    bg = "#FEF9C3";
-    text = "#A16207";
-    label = "보통 😐";
-  } else if (level === "high") {
-    bg = "#FEE2E2";
-    text = "#B91C1C";
-    label = "혼잡 😫";
-  }
-
-  return (
-    <View style={[styles.badge, { backgroundColor: bg }]}>
-      <Text style={[styles.badgeText, { color: text }]}>{label}</Text>
-    </View>
-  );
-};
 
 export default function Home() {
   const router = useRouter();
-
-  // 💡 [변경] 가짜 데이터 대신 실제 데이터를 담을 상태(State) 생성
   const [favorites, setFavorites] = useState<any[]>([]);
 
-  // 💡 [핵심] 화면이 포커스될 때마다(다른 탭 갔다 왔을 때) 실행됨
+  // 화면이 포커스될 때마다 데이터 리로드
   useFocusEffect(
     useCallback(() => {
       const loadData = async () => {
         try {
           const data = await getFavorites();
-          setFavorites(data || []); // 데이터가 없으면 빈 배열
+          setFavorites(data || []);
         } catch (e) {
           console.error("즐겨찾기 로드 실패:", e);
         }
@@ -75,7 +46,7 @@ export default function Home() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
-      {/* 1. 히어로 섹션 (검색창 등 - 그대로 유지) */}
+      {/* 히어로 섹션 */}
       <View style={styles.heroSection}>
         <SafeAreaView edges={["top"]}>
           <View style={styles.topBar}>
@@ -116,20 +87,18 @@ export default function Home() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* 2. 즐겨찾기 섹션 */}
+        {/* 즐겨찾기 섹션 헤더 */}
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRow}>
             <Star size={20} color="#F59E0B" fill="#F59E0B" />
             <Text style={styles.sectionTitle}>즐겨찾는 경로</Text>
           </View>
-          {/* 전체보기 버튼은 나중에 기능 구현 필요 */}
-          <TouchableOpacity onPress={() => router.push("/favorites" as any)}>
+          <TouchableOpacity onPress={() => router.push("/favorites")}>
             <Text style={styles.viewAll}>전체보기</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.cardList}>
-          {/* 💡 [변경] 즐겨찾기 데이터 유무에 따라 화면 다르게 표시 */}
           {favorites.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
@@ -142,41 +111,41 @@ export default function Home() {
                 key={route.id || index}
                 activeOpacity={0.8}
                 onPress={() =>
-                  // 클릭 시 검색 결과 화면으로 이동하며 파라미터 전달
                   router.push({
                     pathname: "/results",
-                    // 💡 저장된 데이터 키값에 맞춰 수정하세요 (depStation vs from)
                     params: {
-                      from: route.depStation || route.from,
-                      to: route.arrStation || route.to,
+                      from: route.from,
+                      to: route.to,
                     },
                   })
                 }
                 style={styles.card}
               >
-                {/* 카드 상단 */}
-                <View style={styles.cardHeader}>
-                  <View>
+                <View style={styles.cardContent}>
+                  {/* 별칭: 크고 볼드하게 */}
+                  <View style={styles.titleRow}>
+                    <Star
+                      size={18}
+                      color="#F59E0B"
+                      fill="#F59E0B"
+                      style={{ marginRight: 8 }}
+                    />
                     <Text style={styles.routeName}>
                       {route.name || "저장된 경로"}
                     </Text>
-                    <View style={styles.routeRow}>
-                      {/* 💡 데이터 필드명 매핑 (depStation이 없으면 from 사용) */}
-                      <Text style={styles.routeStation}>
-                        {route.depStation || route.from}
-                      </Text>
-                      <ChevronRight size={14} color="#9CA3AF" />
-                      <Text style={styles.routeStation}>
-                        {route.arrStation || route.to}
-                      </Text>
-                    </View>
+                  </View>
+
+                  {/* 경로 정보: 작고 회색으로 아래에 배치 */}
+                  <View style={styles.routeSection}>
+                    <Text style={styles.routeStation}>{route.from}</Text>
+                    <Text style={styles.arrowText}>{">"}</Text>
+                    <Text style={styles.routeStation}>{route.to}</Text>
                   </View>
                 </View>
               </TouchableOpacity>
             ))
           )}
 
-          {/* 추가 버튼 */}
           <TouchableOpacity
             onPress={() => router.push("/search")}
             style={styles.addButton}
@@ -193,8 +162,6 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
-
-  // 히어로 섹션
   heroSection: {
     backgroundColor: "white",
     paddingHorizontal: 24,
@@ -230,7 +197,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#F3F4F6",
   },
-
   greetingContainer: { marginBottom: 24 },
   greetingSub: {
     fontSize: 16,
@@ -239,8 +205,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   greetingMain: { fontSize: 28, color: "#111827", fontWeight: "800" },
-
-  // 검색창
   bigSearchBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -264,8 +228,6 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 99,
   },
-
-  // 컨텐츠 영역
   content: { flex: 1, paddingHorizontal: 24, paddingTop: 32 },
   sectionHeader: {
     flexDirection: "row",
@@ -277,19 +239,13 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 20, fontWeight: "700", color: "#111827" },
   viewAll: { fontSize: 14, fontWeight: "600", color: "#2563EB" },
   cardList: { gap: 16 },
-
-  // 💡 [추가] 빈 상태 스타일
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
     marginBottom: 10,
   },
-  emptyText: {
-    color: "#9CA3AF",
-    fontSize: 14,
-  },
-
+  emptyText: { color: "#9CA3AF", fontSize: 14 },
   card: {
     backgroundColor: "white",
     padding: 20,
@@ -303,50 +259,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 16,
-  },
-  routeName: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1F2937",
-    marginBottom: 4,
-  },
-  routeRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  routeStation: { fontSize: 14, fontWeight: "500", color: "#6B7280" },
-  divider: {
-    height: 1,
-    backgroundColor: "#F9FAFB",
-    width: "100%",
-    marginBottom: 16,
-  },
-  cardFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  timeTag: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#EFF6FF",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  timeTagText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#1D4ED8",
-    marginLeft: 4,
-  },
-  durationText: { fontSize: 20, fontWeight: "700", color: "#111827" },
-  durationHighlight: { color: "#2563EB" },
-  badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
-  badgeText: { fontSize: 12, fontWeight: "700" },
+  cardContent: { alignItems: "flex-start" },
+  titleRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
+  routeName: { fontSize: 22, fontWeight: "800", color: "#111827" },
+  routeSection: { flexDirection: "row", alignItems: "center", marginLeft: 28 },
+  routeStation: { fontSize: 16, color: "#9CA3AF", fontWeight: "400" },
+  arrowText: { fontSize: 14, color: "#D1D5DB", marginHorizontal: 8 },
   addButton: {
     flexDirection: "row",
     alignItems: "center",
