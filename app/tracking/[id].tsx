@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { MapPin, X } from "lucide-react-native";
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   ScrollView,
@@ -67,7 +67,7 @@ export default function TrackingScreen() {
       const nextY = context.value + event.translationY;
       translateY.value = Math.max(
         Math.min(nextY, SNAP_POINTS.MIN),
-        SNAP_POINTS.MAX,
+        SNAP_POINTS.MAX
       );
     })
     .onEnd((event) => {
@@ -130,8 +130,7 @@ export default function TrackingScreen() {
         />
         <TouchableOpacity
           onPress={() => router.back()}
-          style={styles.closeButton}
-        >
+          style={styles.closeButton}>
           <X size={24} color="#1F2937" />
         </TouchableOpacity>
       </View>
@@ -164,8 +163,7 @@ export default function TrackingScreen() {
             <Text style={styles.listTitle}>운행 경로</Text>
             <ScrollView
               ref={scrollViewRef}
-              showsVerticalScrollIndicator={false}
-            >
+              showsVerticalScrollIndicator={false}>
               {FULL_ROUTE.map((station, index) => {
                 const isCurrent = index === currentIndex;
                 const isPassed = index < currentIndex;
@@ -202,8 +200,7 @@ export default function TrackingScreen() {
                         styles.stepText,
                         isCurrent && styles.stepTextActive,
                         isPassed && styles.stepTextPassed,
-                      ]}
-                    >
+                      ]}>
                       {station}
                     </Text>
                   </View>
