@@ -7,7 +7,6 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   SafeAreaView,
   StatusBar,
   StyleSheet,
@@ -125,10 +124,6 @@ export default function SearchScreen() {
   };
 
   // ✅ 키보드만 내리고, 검색 상태(searchMode)는 유지
-  const dismissKeyboardOnly = () => {
-    Keyboard.dismiss();
-  };
-
   const renderSuggestionItem = ({ item }: { item: GroupedStation }) => (
     <TouchableOpacity
       onPress={() => handleStationSelect(item.name)}
@@ -153,11 +148,10 @@ export default function SearchScreen() {
       <StatusBar barStyle="dark-content" />
 
       {/* 바깥 터치로 키보드만 내리기 */}
-      <Pressable style={{ flex: 1 }} onPress={dismissKeyboardOnly}>
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
           {/* 헤더 */}
           <View style={styles.header}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -241,8 +235,7 @@ export default function SearchScreen() {
               <Text style={styles.searchButtonText}>경로 검색하기</Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
-      </Pressable>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
